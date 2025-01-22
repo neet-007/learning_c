@@ -1,3 +1,213 @@
-int main(){
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdbool.h>
+
+typedef struct Row{
+    char **fields;
+}Row;
+
+typedef struct Csv{
+    bool same_row_count;
+    int max_row_count;
+    int row_count; 
+    char *filename;
+    Row *rows;
+}Csv;
+
+int parse_row(FILE *f, Csv *csv, int c){
+    size_t fields_count = 0;
+    size_t fields_size = csv->max_row_count == 0 ? 8 : csv->max_row_count;
+    char **fields = calloc(sizeof(char *), fields_size);
+    if (fields == NULL){
+        fprintf(stderr, "unable to allocate memory row\n");
+        return -1;
+    }
+ 
+    size_t buf_size = 16;
+    size_t buf_len = 0;   
+    char *buf = calloc(sizeof(char), buf_size);
+    if (buf == NULL){
+        fprintf(stderr, "unable to allocate memory buf\n");
+        free(fields);
+        return -1;
+    }
+    
+    while(c != EOF && c != '\n' && c != '\r'){
+        switch (c){
+            case ',':{
+                if (buf_len >= buf_size){
+                     buf_size *= 2;
+                     buf = realloc(buf, sizeof(char) * buf_size);
+                     if (buf == NULL){
+                         fprintf(stderr, "unable to allocate memory buf realloc\n");
+                         free(buf);
+                         free(fields);
+                         return -1;
+                     }
+                     memset(buf + buf_len, 0, sizeof(char) * (buf_size - buf_len));
+                 }
+                 buf[buf_len] = '\0';
+                 char *field_copy = calloc(sizeof(char), (buf_len + 1));
+                 if (field_copy == NULL){
+                     fprintf(stderr, "unable to allocate memory field copy\n");
+                     free(buf);
+                     free(fields);
+                     return -1;
+                 }
+                 
+                 strcpy(field_copy, buf);
+                 fields[fields_count++] = field_copy;
+                 buf_len = 0;
+
+                 break;
+            }
+            case '\\':{
+                break;
+            }
+            default:{
+                 if (buf_len >= buf_size){
+                     buf_size *= 2;
+                     buf = realloc(buf, sizeof(char) * buf_size);
+                     if (buf == NULL){
+                         fprintf(stderr, "unable to allocate memory buf realloc\n");
+                         free(buf);
+                         free(fields);
+                         return -1;
+                     }
+                 }
+                 memset(buf + buf_len, 0, sizeof(char) * (buf_size - buf_len));
+                 
+                 buf[buf_len++] = c;   
+                 
+                 break;
+            }
+        }
+        c = fgetc(f);
+    }
+    
+    if (buf_len >= buf_size){
+        buf_size *= 2;
+        buf = realloc(buf, sizeof(char) * buf_size);
+        if (buf == NULL){
+            fprintf(stderr, "unable to allocate memory buf realloc\n");
+            free(buf);
+            free(fields);
+            return -1;
+        }
+        memset(buf + buf_len, 0, sizeof(char) * (buf_size - buf_len));
+    }
+    
+    buf[buf_len] = '\0';
+    char *field_copy = calloc(sizeof(char), (buf_len + 1));
+    if (field_copy == NULL){
+        fprintf(stderr, "unable to allocate memory field copy\n");
+        free(buf);
+        free(fields);
+        return -1;
+    }
+    
+    strncpy(field_copy, buf, buf_len);
+    fields[fields_count++] = field_copy;
+    buf_len = 0;
+    
+    if (csv->max_row_count == 0){
+        csv->max_row_count = fields_count;
+    }
+    
+    Row row = {.fields=fields};
+    csv->rows[csv->row_count++] = row;
+    free(buf);
+    
+    if (c == EOF){
+        return 0;
+    }
+    
+    return 1;
+}
+
+void print_csv(Csv *csv){
+    printf("filename: %s\n", csv->filename);
+    printf("max_row_count %d\n", csv->max_row_count);
+    for (int i = 0; i < csv->row_count; i++){
+        Row row = csv->rows[i];
+        printf("row %d ", i + 1);
+        for (int j = 0; j < csv->max_row_count; j++){
+            if (row.fields[j] == NULL){
+                continue;
+            }
+            printf(" -- %s", row.fields[j]);
+        }
+        printf("\n");
+    }
+}
+
+void free_csv(Csv *csv){
+    free(csv->filename);
+    
+    for (int i = 0; i < csv->row_count; i++){
+        Row row = csv->rows[i];
+        for (int j = 0; j < csv->max_row_count; j++){
+            free(row.fields[j]);
+        }
+        free(row.fields);
+    }
+    free(csv->rows);
+}
+
+int main(int argc, char *argv[]){
+    if (argc != 2){
+        fprintf(stderr, "usage: csv_parser filename.csv\n");
+        return 1;
+    }
+    const char *ext = strrchr(argv[1], '.');
+
+    if (ext == NULL || strcmp(ext, ".csv") != 0) {
+        fprintf(stderr, "must pass file with extention .csv\n");
+        return 1;
+    }
+    
+    char *filename = calloc(sizeof(char), (strlen(argv[1]) + 1));
+    if (filename == NULL){
+        fprintf(stderr, "unable to allocate memory filename\n");
+        return 1;
+    }
+    strncpy(filename, argv[1], strlen(argv[1]));
+    
+    Row *rows = malloc(sizeof(Row) * 8);
+    Csv csv = {
+        .same_row_count=true,
+        .max_row_count=0,
+        .row_count=0,
+        .rows=rows,
+        .filename=filename,
+    };
+    
+    FILE *f = fopen(argv[1], "r");
+    if (f == NULL){
+        free(rows);
+        free(filename);
+        fprintf(stderr, "unable to open file %s\n", argv[1]);
+        return 1;
+    }
+    int c;
+    
+    int res;
+    while ((c = fgetc(f)) != EOF){
+        res = parse_row(f, &csv, c);
+        if (res <= 0){
+            break;
+        }
+    }
+    
+    if (res == -1){
+        free_csv(&csv);
+        fclose(f);
+        return 1;
+    }
+    
+    print_csv(&csv);
+    free_csv(&csv);
+    fclose(f);
     return 0;
 }
