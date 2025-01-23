@@ -27,8 +27,7 @@ typedef struct Csv{
     Row *rows;
 }Csv;
 
-int parse_row(FILE *f, Csv *csv, int c){
-
+int parse_row(FILE *f, Csv *csv){
 #define REALLOC(var_name, size, len, type) \
     do{\
        (size) *= 2;\
@@ -42,7 +41,39 @@ int parse_row(FILE *f, Csv *csv, int c){
        (var_name) = (type *)new_var_name;\
        memset((var_name) + (len), 0, sizeof(type) * ((size) - (len)));\
     } while(false)
-    
+
+#define ADD_TO_BUF() \
+    do{ \
+        if (buf_len >= buf_size){\
+            REALLOC(buf, buf_size, buf_len, char);\
+        }\
+        \        
+        buf[buf_len++] = c;\ 
+    } while(false)
+
+#define ADD_FIELD()\
+    do{\
+       if (buf_len >= buf_size){\
+           REALLOC(buf, buf_size, buf_len, char);\
+       }\
+       buf[buf_len] = '\0';\
+       char *field_copy = calloc(sizeof(char), (buf_len + 1));\
+       if (field_copy == NULL){\
+           fprintf(stderr, "unable to allocate memory field copy\n");\
+           free(buf);\
+           free(fields);\
+           return -1;\
+       }\
+       strcpy(field_copy, buf);\
+       if (fields_count >= fields_size){\
+           REALLOC(fields, fields_size, fields_count, char *);\
+       }\
+       fields[fields_count++] = field_copy;\
+       buf_len = 0;\
+       break;\
+\
+    } while(false)
+
     size_t fields_count = 0;
     size_t fields_size = csv->max_row_count == 0 ? 8 : csv->max_row_count;
     char **fields = calloc(sizeof(char *), fields_size);
@@ -52,15 +83,23 @@ int parse_row(FILE *f, Csv *csv, int c){
     }
  
     size_t buf_size = 16;
-    size_t buf_len = 0;   
+    size_t buf_len = 0; 
     char *buf = calloc(sizeof(char), buf_size);
     if (buf == NULL){
         fprintf(stderr, "unable to allocate memory buf\n");
         free(fields);
         return -1;
     }
-    
-    while(c != EOF && c != '\n' && c != '\r'){
+
+    int c;
+    bool parse_escape = false;
+    bool flag = false;
+    c = fgetc(f);
+    if (c == EOF){
+        return 0;
+    }
+
+    while(!flag){
         if (csv->same_row_count && (csv->max_row_count != 0 && fields_count == csv->max_row_count)){
             fprintf(stderr, "same_row_count enabled and row has more fields %d vs %d\n", fields_count + 1, csv->max_row_count);
             free(buf);
@@ -70,60 +109,51 @@ int parse_row(FILE *f, Csv *csv, int c){
         
         switch (c){
             case ',':{
-                 if (buf_len >= buf_size){
-                     REALLOC(buf, buf_size, buf_len, char);
-                 }
-                 buf[buf_len] = '\0';
-                 char *field_copy = calloc(sizeof(char), (buf_len + 1));
-                 if (field_copy == NULL){
-                     fprintf(stderr, "unable to allocate memory field copy\n");
-                     free(buf);
-                     free(fields);
-                     return -1;
-                 }
-                 
-                 strcpy(field_copy, buf);
-                 if (fields_count >= fields_size){
-                     REALLOC(fields, fields_size, fields_count, char *);
-                 }
-                 fields[fields_count++] = field_copy;
-                 buf_len = 0;
-
+                 ADD_FIELD();
                  break;
             }
-            case '\\':{
+            case '\r':
+            case '\n':
+            case EOF:{
+                if (!parse_escape){
+                    ADD_FIELD();
+                    flag = true;
+                    break;
+                }
+                if (c == EOF){
+                    fprintf(stderr, "unterminated escape \"\n");
+                    return -1;
+                }
+                ADD_TO_BUF();
+                break;
+            }
+            case '"':{
+                if (!parse_escape){
+                    parse_escape = true;
+                    break;
+                }
+                c = fgetc(f);
+                if (c == '"'){
+                    ADD_TO_BUF();
+                    break;
+                }
+                if (c != ',' && c != EOF){
+                    fprintf(stderr, "unsupported use of termination charector \"\n");
+                    return -1;
+                }
+                ADD_FIELD();
                 break;
             }
             default:{
-                 if (buf_len >= buf_size){
-                     REALLOC(buf, buf_size, buf_len, char);
-                 }
-                 
-                 buf[buf_len++] = c;   
-                 
+                 ADD_TO_BUF();
                  break;
             }
         }
-        c = fgetc(f);
+        if (!flag){
+            c = fgetc(f);
+        }
     }
-    
-    if (buf_len >= buf_size){
-        REALLOC(buf, buf_size, buf_len, char);
-    }
-    
-    buf[buf_len] = '\0';
-    char *field_copy = calloc(sizeof(char), (buf_len + 1));
-    if (field_copy == NULL){
-        fprintf(stderr, "unable to allocate memory field copy\n");
-        free(buf);
-        free(fields);
-        return -1;
-    }
-    
-    strncpy(field_copy, buf, buf_len);
-    fields[fields_count++] = field_copy;
-    buf_len = 0;
-    
+
     if (csv->max_row_count == 0){
         csv->max_row_count = fields_count;
     }
@@ -132,11 +162,13 @@ int parse_row(FILE *f, Csv *csv, int c){
     csv->rows[csv->row_count++] = row;
     free(buf);
     
+#undef REALLOC
+#undef ADD_TO_BUF
+#undef ADD_FIELD
+    
     if (c == EOF){
         return 0;
     }
-    
-#undef REALLOC
     return 1;
 }
 
@@ -308,14 +340,10 @@ int main(int argc, char *argv[]){
         fprintf(stderr, "unable to open file %s\n", argv[1]);
         return 1;
     }
-    int c;
-    
-    int res;
-    while ((c = fgetc(f)) != EOF){
-        res = parse_row(f, &csv, c);
-        if (res <= 0){
-            break;
-        }
+
+    int res = 1;
+    while(res > 0){
+        res = parse_row(f, &csv);
     }
     
     if (res == -1){
