@@ -77,17 +77,15 @@ Trie *trie_new(int value, int is_terminal){
 }
 
 Trie *trie_search(Trie *trie, char *value, size_t value_size){
-    Trie *curr, *temp;
+    Trie *curr;
     size_t i;
 
     curr = trie;
     for (i = 0; i < value_size; i++){
-        temp = curr->children[value[i] - 'a'];
-        if (temp == NULL){
+        curr = curr->children[value[i] - 'a'];
+        if (curr == NULL){
             return NULL;
         }
-
-        curr = temp;
     }
 
     return curr;
@@ -99,6 +97,7 @@ int trie_add(Trie *trie, char *value, size_t value_size){
     int index;
 
     curr = trie;
+    new = NULL;
     for (i = 0; i < value_size; i++){
         new = trie_new(value[i], 0);
         if (new == NULL){
@@ -114,7 +113,9 @@ int trie_add(Trie *trie, char *value, size_t value_size){
         curr->children[index] = new;
         curr = new;
     }
-    new->is_terminal = 1;
+    if (new){
+        new->is_terminal = 1;
+    }
 
     return 1;
 }
@@ -179,15 +180,22 @@ void free_trie(Trie *trie){
     free(trie);
 }
 
+/*
 int main(void){
-    char *word = "helloworld";
+    char *word = "hello";
     Trie *trie = trie_build(word, strlen(word));
+    word = "world";
+    trie_add(trie, word, strlen(word));
     if (trie == NULL){
         fprintf(stderr, "unable to build trie\n %s", get_trie_package_error_message());
         return 1;
     }
 
+    printf("LEVELS\n");
+    trie_print(trie, PRINT_LEVELS);
+    printf("\n\nSTRING\n");
     trie_print(trie, PRINT_STRING);
     free_trie(trie);
     return 0;
 }
+*/
