@@ -17,12 +17,17 @@ typedef struct Trie{
     Trie *children[MAX_CHILDREN];
 }Trie;
 
+typedef enum Trie_package_print_type{
+    PRINT_LEVELS,
+    PRINT_STRING,
+} Trie_package_print_type;
+
 Trie *trie_build(char *value, size_t value_size);
 Trie *trie_new(int value, int is_terminal);
 Trie *trie_search(Trie *trie, char *value, size_t value_size);
 int trie_add(Trie *trie, char *value, size_t value_size);
 int trie_delete(Trie *trie, char *value, size_t value_size);
-void trie_print(Trie *trie);
+void trie_print(Trie *trie, Trie_package_print_type print_type);
 void free_trie(Trie *trie);
 char *get_trie_package_error_message();
 

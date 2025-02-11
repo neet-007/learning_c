@@ -1,35 +1,29 @@
 #include "trie.h"
-#include <stdlib.h>
 
-typedef enum TRIE_PACKAGE_ERROR{
+typedef enum Trie_package_error{
     MEMORY_ERROR,
-} TRIE_PACKAGE_ERROR;
+    INVALID_PRINT_TYPE,
+} Trie_package_error;
 
-TRIE_PACKAGE_ERROR trie_package_error;
+Trie_package_error trie_package_error;
 size_t trie_package_error_message_len = 0;
 char *trie_package_error_message = NULL;
 
 void add_to_trie_package_error_message(char *message){
-    size_t prev_len = trie_package_error_message_len;
-    if (trie_package_error_message == NULL){
-        trie_package_error_message_len = strlen(message);
-        trie_package_error_message = malloc(sizeof(char) * (trie_package_error_message_len + 2));
-        if (trie_package_error_message == NULL){
-            return;
-        }
-        trie_package_error_message[0] = '\0';
-    }else{
-        trie_package_error_message_len = trie_package_error_message_len + strlen(message);
-        char *temp = realloc(trie_package_error_message, sizeof(char) * (trie_package_error_message_len + 2));
-        if (temp == NULL){
-            return;
-        }
-        trie_package_error_message = temp;
-    }
+    size_t prev_len = trie_package_error_message ? trie_package_error_message_len : 0;
 
-    trie_package_error_message[prev_len] = '\n';
-    trie_package_error_message[prev_len + 1] = '\0';
+    trie_package_error_message_len = prev_len + strlen(message);
+
+    char *temp = realloc(trie_package_error_message, sizeof(char) * (trie_package_error_message_len + 2));
+    if (temp == NULL) {
+        return;
+    }
+    trie_package_error_message = temp;
+
     strcpy(trie_package_error_message + prev_len, message);
+
+    trie_package_error_message[trie_package_error_message_len] = '\n';
+    trie_package_error_message[trie_package_error_message_len + 1] = '\0';
 }
 
 char *get_trie_package_error_message(){
@@ -40,6 +34,10 @@ void free_trie_package_error_message(){
     if (trie_package_error_message != NULL){
         free(trie_package_error_message);
     }
+}
+
+void set_trie_package_error(Trie_package_error error){
+    trie_package_error = error;
 }
 
 Trie *trie_build(char *value, size_t value_size){
@@ -64,7 +62,7 @@ Trie *trie_new(int value, int is_terminal){
     Trie *trie = malloc(sizeof(Trie));
     if (trie == NULL){
         add_to_trie_package_error_message("unable to allocate memory for new trie");
-        trie_package_error = MEMORY_ERROR;
+        set_trie_package_error(MEMORY_ERROR);
         return NULL;
     }
 
@@ -79,18 +77,16 @@ Trie *trie_new(int value, int is_terminal){
 }
 
 Trie *trie_search(Trie *trie, char *value, size_t value_size){
-    Trie *curr, *temp, *prev;
+    Trie *curr, *temp;
     size_t i;
 
     curr = trie;
-    prev = curr;
     for (i = 0; i < value_size; i++){
         temp = curr->children[value[i] - 'a'];
         if (temp == NULL){
-            return prev;;
+            return NULL;
         }
 
-        prev = temp;
         curr = temp;
     }
 
@@ -100,20 +96,23 @@ Trie *trie_search(Trie *trie, char *value, size_t value_size){
 int trie_add(Trie *trie, char *value, size_t value_size){
     Trie *curr, *new;
     size_t i;
+    int index;
 
-    curr = trie_search(trie, value, value_size);
-    if (curr == NULL){
-        return 0;
-    }
-
+    curr = trie;
     for (i = 0; i < value_size; i++){
         new = trie_new(value[i], 0);
         if (new == NULL){
             add_to_trie_package_error_message("unable to create new trie");
             return 0;
         }
+        index = value[i] - 'a';
 
-        curr->children[value[i] - 'a'] = new;
+        while(curr->children[index] != NULL){
+            curr = curr->children[index];
+        }
+
+        curr->children[index] = new;
+        curr = new;
     }
     new->is_terminal = 1;
 
@@ -124,23 +123,49 @@ int trie_delete(Trie *trie, char *value, size_t value_size){
     return 1;
 }
 
-void trie_print(Trie *trie){
-    Trie *child;
-    int i, queue_len;
+void trie_print(Trie *trie, Trie_package_print_type print_type){
+    switch (print_type) {
+        case PRINT_LEVELS:{
+            Trie *child, **temp_queue;
+            int i;
+            size_t queue_len;
 
-    queue_len = 0;
-    Trie *queue[MAX_CHILDREN];
-    printf("parent: %c\n", trie->value);
-    for (i = 0; i < MAX_CHILDREN; i++){
-        child = trie->children[i];
-        if (child != NULL){
-            printf("%c -- ", child->value);
-            queue[queue_len++] = child;
+            queue_len = 0;
+            Trie *queue[MAX_CHILDREN];
+
+            printf("level start\nparent: %c\n", trie->value);
+            for (i = 0; i < MAX_CHILDREN; i++){
+                child = trie->children[i];
+                if (child != NULL){
+                    printf("%c -- ", child->value);
+                    queue[queue_len++] = child;
+                }
+            }
+            printf("\nlevel end\n\n");
+            for (i = 0; i < queue_len; i++){
+                trie_print(queue[i], print_type);
+            }
+            break;
         }
-    }
-    printf("\n\n");
-    for (i = 0; i < queue_len; i++){
-        trie_print(queue[i]);
+        case PRINT_STRING:{
+            Trie *child;
+            int i;
+
+            printf("%c", trie->value);
+            for (i = 0; i < MAX_CHILDREN; i++){
+                child = trie->children[i];
+                if (child != NULL){
+                    trie_print(child, print_type);
+                }
+            }
+            printf("\n");
+            break;
+        }
+        default:{
+            set_trie_package_error(INVALID_PRINT_TYPE);
+            add_to_trie_package_error_message("invalid print type for trie");
+            return;
+        }
     }
 }
 
@@ -155,13 +180,14 @@ void free_trie(Trie *trie){
 }
 
 int main(void){
-    Trie *trie = trie_build("world", strlen("world"));
+    char *word = "helloworld";
+    Trie *trie = trie_build(word, strlen(word));
     if (trie == NULL){
         fprintf(stderr, "unable to build trie\n %s", get_trie_package_error_message());
         return 1;
     }
 
-    trie_print(trie);
+    trie_print(trie, PRINT_STRING);
     free_trie(trie);
     return 0;
 }
