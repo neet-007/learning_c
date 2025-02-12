@@ -13,7 +13,7 @@ typedef struct Trie Trie;
 
 typedef struct Trie{
     int value;
-    int is_terminal;
+    int word_count;
     Trie *children[MAX_CHILDREN];
 }Trie;
 

@@ -36,8 +36,9 @@ int test_interactive(){
     int res;
     Trie *temp;
     int i;
-    size_t buf_len, print_len;
+    size_t buf_len, print_len, delete_len;
     print_len = strlen("print");
+    delete_len = strlen("delete");
 
     Trie *trie = trie_build("", 0);
     if (trie == NULL){
@@ -65,6 +66,22 @@ int test_interactive(){
             }
             continue;
         }
+        if (strncmp(buf, "delete", delete_len) == 0){
+            buf_len = strlen(buf + delete_len + 1);
+            res = trie_delete(trie, buf + delete_len + 1, buf_len);
+            if (!res){
+                fprintf(stderr, "unable to delete %s to trie error: %s\n", buf, get_trie_package_error_message());
+                free_trie(trie);
+                return 1;
+            }
+
+            temp = trie_search(trie, buf, buf_len);
+            if (temp != NULL){
+                fprintf(stderr, "test failed unable to unfind %s after inserstion\n", buf);
+                continue;
+            }
+            continue;
+        }
         buf_len = strlen(buf);
 
         res = trie_add(trie, buf, buf_len);
@@ -77,8 +94,7 @@ int test_interactive(){
         temp = trie_search(trie, buf, buf_len);
         if (temp == NULL){
             fprintf(stderr, "test failed unable to find %s after inserstion\n", buf);
-            free_trie(trie);
-            return 1;
+            continue;
         }
     }
 

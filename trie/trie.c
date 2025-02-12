@@ -1,11 +1,12 @@
 #include "trie.h"
 
 typedef enum Trie_package_error{
+    NO_ERROR,
     MEMORY_ERROR,
     INVALID_PRINT_TYPE,
 } Trie_package_error;
 
-Trie_package_error trie_package_error;
+Trie_package_error trie_package_error = NO_ERROR;
 size_t trie_package_error_message_len = 0;
 char *trie_package_error_message = NULL;
 
@@ -67,7 +68,7 @@ Trie *trie_new(int value, int is_terminal){
     }
 
     trie->value = value;
-    trie->is_terminal = is_terminal;
+    trie->word_count = is_terminal;
 
     for (int i = 0; i < MAX_CHILDREN; i++){
         trie->children[i] = NULL;
@@ -99,28 +100,84 @@ int trie_add(Trie *trie, char *value, size_t value_size){
     curr = trie;
     new = NULL;
     for (i = 0; i < value_size; i++){
+        index = value[i] - 'a';
+        if (curr->children[index] != NULL){
+            curr = curr->children[index];
+            new = curr;
+            continue;
+        }
+
         new = trie_new(value[i], 0);
         if (new == NULL){
             add_to_trie_package_error_message("unable to create new trie");
             return 0;
-        }
-        index = value[i] - 'a';
-
-        while(curr->children[index] != NULL){
-            curr = curr->children[index];
         }
 
         curr->children[index] = new;
         curr = new;
     }
     if (new){
-        new->is_terminal = 1;
+        new->word_count++;
     }
 
     return 1;
 }
 
 int trie_delete(Trie *trie, char *value, size_t value_size){
+    Trie *curr, **queue, **temp;
+    size_t i, j, queue_len, queue_size;
+    int found;
+
+    queue_size = MAX_CHILDREN;
+    queue = malloc(sizeof(Trie) * queue_size);
+    if (queue == NULL){
+        set_trie_package_error(MEMORY_ERROR);
+        add_to_trie_package_error_message("unable to allocate memory for queue in trie_delete");
+        return 0;
+    }
+
+    curr = trie;
+    queue[queue_len++] = curr;
+    for (i = 0; i < value_size; i++){
+        curr = curr->children[value[i] - 'a'];
+        if (curr == NULL){
+            return 0;
+        }
+        if (queue_len >= queue_size){
+            queue_size *= 2;
+            temp = realloc(queue, sizeof(Trie) * queue_size);
+            if (temp == NULL){
+                set_trie_package_error(MEMORY_ERROR);
+                add_to_trie_package_error_message("unable to reallocate memory for queue in trie_delete");
+                free(queue);
+                return 0;
+            }
+        }
+        queue[queue_len++] = curr;
+    }
+
+    for (i = 0; i < queue_len; i++){
+        found = 0;
+        curr = queue[i];
+        for (j = 0; j < MAX_CHILDREN; j++){
+            if (curr->children[j] != NULL){
+                found = 1;
+            }
+        }
+        if (found){
+            curr->word_count = curr->word_count > 1 ? curr->word_count - 1 : 0;
+            continue;
+        }
+
+        if (i > 0){
+            queue[i - 1]->children[curr->value - 'a'] = NULL;
+        }else{
+            trie->children[curr->value - 'a'] = NULL;
+        }
+
+        free(curr);
+    }
+
     return 1;
 }
 
@@ -134,7 +191,7 @@ void trie_print(Trie *trie, Trie_package_print_type print_type){
             queue_len = 0;
             Trie *queue[MAX_CHILDREN];
 
-            printf("level start\nparent: %c\n", trie->value);
+            printf("level start\nparent: %c, word_count: %d\n", trie->value, trie->word_count);
             for (i = 0; i < MAX_CHILDREN; i++){
                 child = trie->children[i];
                 if (child != NULL){
@@ -150,16 +207,23 @@ void trie_print(Trie *trie, Trie_package_print_type print_type){
         }
         case PRINT_STRING:{
             Trie *child;
-            int i;
+            int i, printed;
 
-            printf("%c", trie->value);
+            printed = 0;
             for (i = 0; i < MAX_CHILDREN; i++){
                 child = trie->children[i];
                 if (child != NULL){
+                    printed = 1;
+                    printf("%c", trie->value);
                     trie_print(child, print_type);
                 }
             }
-            printf("\n");
+            if (!printed){
+                printf("%c", trie->value);
+            }
+            if (trie->word_count){
+                printf("\n");
+            }
             break;
         }
         default:{
@@ -179,23 +243,3 @@ void free_trie(Trie *trie){
 
     free(trie);
 }
-
-/*
-int main(void){
-    char *word = "hello";
-    Trie *trie = trie_build(word, strlen(word));
-    word = "world";
-    trie_add(trie, word, strlen(word));
-    if (trie == NULL){
-        fprintf(stderr, "unable to build trie\n %s", get_trie_package_error_message());
-        return 1;
-    }
-
-    printf("LEVELS\n");
-    trie_print(trie, PRINT_LEVELS);
-    printf("\n\nSTRING\n");
-    trie_print(trie, PRINT_STRING);
-    free_trie(trie);
-    return 0;
-}
-*/
