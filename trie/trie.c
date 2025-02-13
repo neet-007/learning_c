@@ -34,6 +34,7 @@ char *get_trie_package_error_message(){
 void free_trie_package_error_message(){
     if (trie_package_error_message != NULL){
         free(trie_package_error_message);
+        trie_package_error_message = NULL;
     }
 }
 
@@ -83,7 +84,7 @@ Trie *trie_search(Trie *trie, char *value, size_t value_size){
 
     curr = trie;
     for (i = 0; i < value_size; i++){
-        curr = curr->children[value[i] - 'a'];
+        curr = curr->children[value[i]];
         if (curr == NULL){
             return NULL;
         }
@@ -100,14 +101,18 @@ int trie_add(Trie *trie, char *value, size_t value_size){
     curr = trie;
     new = NULL;
     for (i = 0; i < value_size; i++){
-        index = value[i] - 'a';
+        index = value[i];
+        if (index < 0 || MAX_CHILDREN < index){
+            add_to_trie_package_error_message("unable to add value outside the range");
+            return 0;
+        }
         if (curr->children[index] != NULL){
             curr = curr->children[index];
             new = curr;
             continue;
         }
 
-        new = trie_new(value[i], 0);
+        new = trie_new(index, 0);
         if (new == NULL){
             add_to_trie_package_error_message("unable to create new trie");
             return 0;
@@ -125,8 +130,8 @@ int trie_add(Trie *trie, char *value, size_t value_size){
 
 int trie_delete(Trie *trie, char *value, size_t value_size){
     Trie *curr, **queue, **temp;
-    size_t i, j, queue_len, queue_size;
-    int found;
+    size_t j, queue_len, queue_size;
+    int found, i;
 
     queue_size = MAX_CHILDREN;
     queue = malloc(sizeof(Trie) * queue_size);
@@ -137,9 +142,9 @@ int trie_delete(Trie *trie, char *value, size_t value_size){
     }
 
     curr = trie;
-    queue[queue_len++] = curr;
+    queue_len = 0;
     for (i = 0; i < value_size; i++){
-        curr = curr->children[value[i] - 'a'];
+        curr = curr->children[value[i]];
         if (curr == NULL){
             return 0;
         }
@@ -156,23 +161,31 @@ int trie_delete(Trie *trie, char *value, size_t value_size){
         queue[queue_len++] = curr;
     }
 
-    for (i = 0; i < queue_len; i++){
+    for (i = queue_len - 1; i >= 0; i--){
         found = 0;
         curr = queue[i];
         for (j = 0; j < MAX_CHILDREN; j++){
             if (curr->children[j] != NULL){
                 found = 1;
+                break;
             }
         }
+
+        if (curr->word_count > 1){
+            curr->word_count--;
+            break;
+        }else{
+            curr->word_count = 0;
+        }
+
         if (found){
-            curr->word_count = curr->word_count > 1 ? curr->word_count - 1 : 0;
             continue;
         }
 
         if (i > 0){
-            queue[i - 1]->children[curr->value - 'a'] = NULL;
+            queue[i - 1]->children[curr->value] = NULL;
         }else{
-            trie->children[curr->value - 'a'] = NULL;
+            trie->children[curr->value] = NULL;
         }
 
         free(curr);

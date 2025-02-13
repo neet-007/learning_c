@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define MAX_CHILDREN 27
+#define MAX_CHILDREN 128
 #define EMPTY_CHAR '\0'
 
 typedef struct Trie Trie;
