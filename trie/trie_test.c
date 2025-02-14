@@ -10,7 +10,7 @@ int test_build_empty(char function_name[256], char error[256]){
         return 0;
     }
 
-    free_trie(trie);
+    trie_free(trie);
     return 1;
 }
 
@@ -18,7 +18,7 @@ int test_build_outside_char_range(char function_name[256], char error[256]){
     strcpy(function_name, __func__);
     Trie *trie = trie_build("你好", 2);
     if (trie != NULL){
-        free_trie(trie);
+        trie_free(trie);
         strcpy(error, "expected trie not to exists at test_build_outsize_char_range\n");
         return 0;
     }
@@ -32,18 +32,18 @@ int test_build_invalid_size_less(char function_name[256], char error[256]){
     Trie *trie = trie_build(word, strlen(word) - 2);
     if (trie == NULL){
         strcpy(error, "expected trie to exists got null at test_build_invalid_size_less\n");
-        free_trie(trie);
+        trie_free(trie);
         return 0;
     }
 
     Trie *temp = trie_search(trie, word, strlen(word));
     if (temp != NULL){
         strcpy(error, "expected not to find %s at test_build_invalid_size_less\n");
-        free_trie(trie);
+        trie_free(trie);
         return 0;
     }
 
-    free_trie(trie);
+    trie_free(trie);
     return 1;
 }
 
@@ -59,11 +59,11 @@ int test_build_invalid_size_greater(char function_name[256], char error[256]){
     Trie *temp = trie_search(trie, word, strlen(word));
     if (temp != NULL){
         strcpy(error, "expected not to find %s at test_build_invalid_size_greater\n");
-        free_trie(trie);
+        trie_free(trie);
         return 0;
     }
 
-    free_trie(trie);
+    trie_free(trie);
     return 1;
 }
 
@@ -75,7 +75,7 @@ int test_build_pass(char function_name[256], char error[256]){
         return 0;
     }
 
-    free_trie(trie);
+    trie_free(trie);
     return 1;
 }
 
@@ -95,7 +95,7 @@ int test_add_outside_char_range(char function_name[256], char error[256]){
         return 0;
     }
 
-    free_trie(trie);
+    trie_free(trie);
     return 1;
 }
 
@@ -122,17 +122,17 @@ int test_add_same_word_multiple(char function_name[256], char error[256]){
     Trie *temp = trie_search(trie, value, strlen(value));
     if (temp == NULL){
         strcpy(error, "expected find word after insertion at test_add_same_word_multiple\n");
-        free_trie(trie);
+        trie_free(trie);
         return 0;
     }
 
     if (temp->word_count != count){
         strcpy(error, "expected find word %s times got %s after insertion at test_add_same_word_multiple\n");
-        free_trie(trie);
+        trie_free(trie);
         return 0;
     }
 
-    free_trie(trie);
+    trie_free(trie);
     return 1;
 }
 
@@ -143,7 +143,7 @@ int test_add(char error[256]){
         return 0;
     }
 
-    free_trie(trie);
+    trie_free(trie);
     return 1;
 }
 
@@ -162,7 +162,7 @@ int test_add_pass(char function_name[256], char error[256]){
         return 0;
     }
 
-    free_trie(trie);
+    trie_free(trie);
     return 1;
 }
 
@@ -177,7 +177,7 @@ int test_delete_not_in_trie(char function_name[256], char error[256]){
     char *value = "hello";
     int res = trie_add(trie, value, strlen(value));
     if (!res){
-        free_trie(trie);
+        trie_free(trie);
         strcpy(error, "expected res to be 0 when adding at test_delete_not_in_trie\n");
         return 0;
     }
@@ -185,12 +185,12 @@ int test_delete_not_in_trie(char function_name[256], char error[256]){
     value = "notin";
     res = trie_delete(trie, value, strlen(value));
     if (res){
-        free_trie(trie);
+        trie_free(trie);
         strcpy(error, "expected res to be 0 when adding at test_delete_not_in_trie\n");
         return 0;
     }
 
-    free_trie(trie);
+    trie_free(trie);
     return 1;
 }
 
@@ -208,7 +208,7 @@ int test_delete_inserted_multiple(char function_name[256], char error[256]){
     for (int i = 0; i < count; i++){
         res = trie_add(trie, value, strlen(value));
         if (!res){
-            free_trie(trie);
+            trie_free(trie);
             strcpy(error, "expected res to be 0 when adding at test_delete_inserted_multiple\n");
             return 0;
         }
@@ -217,23 +217,23 @@ int test_delete_inserted_multiple(char function_name[256], char error[256]){
     res = trie_delete(trie, value, strlen(value));
     if (!res){
         strcpy(error, "expected res to be 1 when adding at test_delete_inserted_multiple\n");
-        free_trie(trie);
+        trie_free(trie);
         return 0;
     }
     Trie *temp = trie_search(trie, value, strlen(value));
     if (temp == NULL){
         strcpy(error, "expected to find word after deletion at test_delete_inserted_multiple\n");
-        free_trie(trie);
+        trie_free(trie);
         return 0;
     }
 
     if (temp->word_count != count - 1){
         strcpy(error, "expected to count to be got after deletion at test_delete_inserted_multiple\n");
-        free_trie(trie);
+        trie_free(trie);
         return 0;
     }
 
-    free_trie(trie);
+    trie_free(trie);
     return 1;
 }
 
@@ -248,19 +248,19 @@ int test_delete_pass(char function_name[256], char error[256]){
     char *value = "hello";
     int res = trie_add(trie, value, strlen(value));
     if (!res){
-        free_trie(trie);
+        trie_free(trie);
         strcpy(error, "expected res to be 1 when adding at test_delete_pass\n");
         return 0;
     }
 
     res = trie_delete(trie, value, strlen(value));
     if (!res){
-        free_trie(trie);
+        trie_free(trie);
         strcpy(error, "expected res to be 1 when adding at test_delete_pass\n");
         return 0;
     }
 
-    free_trie(trie);
+    trie_free(trie);
     return 1;
 }
 
@@ -479,7 +479,7 @@ int test_interactive(){
         res = trie_add(trie, buf, buf_len);
         if (!res){
             fprintf(stderr, "unable to add %s to trie error: %s\n", buf, get_trie_package_error_message());
-            free_trie(trie);
+            trie_free(trie);
             return 1;
         }
 
@@ -490,7 +490,7 @@ int test_interactive(){
         }
     }
 
-    free_trie(trie);
+    trie_free(trie);
     return 0;
 }
 

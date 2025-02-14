@@ -44,7 +44,7 @@ void set_trie_package_error(Trie_package_error error){
 
 Trie *trie_build(char *value, size_t value_size){
     atexit(free_trie_package_error_message);
-    Trie *trie = trie_new(EMPTY_CHAR, 0);
+    Trie *trie = trie_new(EMPTY_CHAR, 0, NULL);
     if (trie == NULL){
         add_to_trie_package_error_message("unable to initizlize trie");
         return NULL;
@@ -60,7 +60,8 @@ Trie *trie_build(char *value, size_t value_size){
     return trie;
 }
 
-Trie *trie_new(int value, int is_terminal){
+// parent=NULL
+Trie *trie_new(int value, int is_terminal, Trie *parent){
     Trie *trie = malloc(sizeof(Trie));
     if (trie == NULL){
         add_to_trie_package_error_message("unable to allocate memory for new trie");
@@ -70,6 +71,7 @@ Trie *trie_new(int value, int is_terminal){
 
     trie->value = value;
     trie->word_count = is_terminal;
+    trie->parent = parent;
 
     for (int i = 0; i < MAX_CHILDREN; i++){
         trie->children[i] = NULL;
@@ -112,7 +114,7 @@ int trie_add(Trie *trie, char *value, size_t value_size){
             continue;
         }
 
-        new = trie_new(index, 0);
+        new = trie_new(index, 0, curr);
         if (new == NULL){
             add_to_trie_package_error_message("unable to create new trie");
             return 0;
@@ -146,6 +148,7 @@ int trie_delete(Trie *trie, char *value, size_t value_size){
     for (i = 0; i < value_size; i++){
         curr = curr->children[value[i]];
         if (curr == NULL){
+            free(queue);
             return 0;
         }
         if (queue_len >= queue_size){
@@ -191,6 +194,7 @@ int trie_delete(Trie *trie, char *value, size_t value_size){
         free(curr);
     }
 
+    free(queue);
     return 1;
 }
 
@@ -204,7 +208,8 @@ void trie_print(Trie *trie, Trie_package_print_type print_type){
             queue_len = 0;
             Trie *queue[MAX_CHILDREN];
 
-            printf("level start\nparent: %c, word_count: %d\n", trie->value, trie->word_count);
+            printf("level start\nparent: %c, word_count: %d curr_parent: %c\n", trie->value, trie->word_count,
+                   trie->parent ? trie->parent->value : '\0');
             for (i = 0; i < MAX_CHILDREN; i++){
                 child = trie->children[i];
                 if (child != NULL){
@@ -247,10 +252,10 @@ void trie_print(Trie *trie, Trie_package_print_type print_type){
     }
 }
 
-void free_trie(Trie *trie){
+void trie_free(Trie *trie){
     for (int i = 0; i < MAX_CHILDREN; i++){
         if (trie->children[i] != NULL){
-            free_trie(trie->children[i]);
+            trie_free(trie->children[i]);
         }
     }
 
